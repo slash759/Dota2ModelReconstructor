@@ -135,10 +135,6 @@ public sealed class AddonModelDecompiler
             _class = "Softbody"
             children =
             [
-                {
-                    _class = "ClothEffectFolder"
-                    are_effects_mutually_exclude = true
-                },
             ]
             stiffness_on_ragdoll = 0.0
             motion_smooth_cdt = 0.0
