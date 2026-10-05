@@ -8,7 +8,7 @@ public static class LegacyPhysToolRunner
     private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect"];
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
-    public static IReadOnlyList<string> Run(string sourcePhysPath, string? destinationDirectory = null)
+    public static IReadOnlyList<string> Run(string sourcePhysPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePhysPath);
         if (!File.Exists(sourcePhysPath))
@@ -51,24 +51,19 @@ public static class LegacyPhysToolRunner
                         $"{tool}.exe failed with exit code {result.ExitCode}.\n{result.StandardError}\n{result.StandardOutput}".Trim());
             }
 
-            var outputs = generatedFiles.ToArray();
-
-            if (!string.IsNullOrWhiteSpace(destinationDirectory))
-            {
-                Directory.CreateDirectory(destinationDirectory);
-                foreach (var output in outputs)
-                {
-                    var destination = Path.Combine(destinationDirectory, Path.GetFileName(output));
-                    File.Copy(output, destination, overwrite: true);
-                }
-            }
-
-            return outputs;
+            return generatedFiles.ToArray();
         }
         finally
         {
-            try { if (File.Exists(toolPhysPath)) File.Delete(toolPhysPath); }
-            catch { /* Best-effort cleanup. */ }
+            foreach (var temporaryName in new[] { "phys.txt", "cloth_shapes.vmdl.txt", "cloth_effects_vmdl.txt" })
+            {
+                try
+                {
+                    var temporaryPath = Path.Combine(toolsDirectory, temporaryName);
+                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+                }
+                catch { /* Best-effort cleanup. */ }
+            }
         }
     }
 
