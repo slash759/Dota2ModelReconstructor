@@ -8,7 +8,7 @@ public static class LegacyPhysToolRunner
     private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect"];
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
-    public static IReadOnlyList<string> Run(string sourcePhysPath)
+    public static IReadOnlyList<string> Run(string sourcePhysPath, string? destinationDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePhysPath);
         if (!File.Exists(sourcePhysPath))
@@ -51,7 +51,19 @@ public static class LegacyPhysToolRunner
                         $"{tool}.exe failed with exit code {result.ExitCode}.\n{result.StandardError}\n{result.StandardOutput}".Trim());
             }
 
-            return generatedFiles.ToArray();
+            var outputs = generatedFiles.ToArray();
+
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+                foreach (var output in outputs)
+                {
+                    var destination = Path.Combine(destinationDirectory, Path.GetFileName(output));
+                    File.Copy(output, destination, overwrite: true);
+                }
+            }
+
+            return outputs;
         }
         finally
         {
