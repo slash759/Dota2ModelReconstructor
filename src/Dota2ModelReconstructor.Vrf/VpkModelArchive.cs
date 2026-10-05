@@ -24,7 +24,7 @@ public sealed class VpkModelArchive : IDisposable
             .ToArray() ?? [];
     }
 
-    public DecompileResult Decompile(string modelPath, string outputDirectory)
+    public DecompileResult Decompile(string modelPath, string addonRoot)
     {
         var entry = package.FindEntry(modelPath)
             ?? throw new FileNotFoundException($"Model '{modelPath}' was not found inside the VPK.");
@@ -35,7 +35,7 @@ public sealed class VpkModelArchive : IDisposable
         resource.Read(stream);
 
         using var loader = new GameFileLoader(package, FileName);
-        return new VrfModelDecompiler().DecompileResource(resource, loader, modelPath, outputDirectory);
+        return new AddonModelDecompiler().Decompile(resource, loader, modelPath, addonRoot);
     }
 
     public void Dispose() => package.Dispose();
