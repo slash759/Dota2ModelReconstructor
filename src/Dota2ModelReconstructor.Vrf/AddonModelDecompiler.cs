@@ -36,28 +36,21 @@ public sealed class AddonModelDecompiler
         var physBlock = resource.GetBlockByType(BlockType.PHYS);
         if (physBlock is not null)
         {
-            // phys.txt is only an intermediate input. Keep it in the system temp
-            // directory so no reconstruction folder is left beside the VMDL.
-            var tempDirectory = Path.Combine(Path.GetTempPath(), "Dota2ModelReconstructor", Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(tempDirectory);
-            var physPath = Path.Combine(tempDirectory, "phys.txt");
+            var reconstructionDirectory = Path.Combine(
+                Path.GetDirectoryName(vmdlPath)!,
+                "reconstruction",
+                Path.GetFileNameWithoutExtension(vmdlPath));
+            Directory.CreateDirectory(reconstructionDirectory);
 
-            try
-            {
-                // S2V's text viewer renders each indentation level as four spaces. VRF's
-                // IndentedTextWriter uses tabs internally, so normalize only indentation;
-                // the PHYS values and KV3 structure remain untouched.
-                var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
-                File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            var physPath = Path.Combine(reconstructionDirectory, "phys.txt");
+            // S2V's text viewer renders each indentation level as four spaces. VRF's
+            // IndentedTextWriter uses tabs internally, so normalize only indentation;
+            // the PHYS values and KV3 structure remain untouched.
+            var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
+            File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-                var helperOutputs = LegacyPhysToolRunner.Run(physPath);
-                AppendRootChildren(vmdlPath, helperOutputs);
-            }
-            finally
-            {
-                try { Directory.Delete(tempDirectory, recursive: true); }
-                catch { /* Best-effort cleanup. */ }
-            }
+            var helperOutputs = LegacyPhysToolRunner.Run(physPath, reconstructionDirectory);
+            AppendRootChildren(vmdlPath, helperOutputs);
         }
 
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
