@@ -25,8 +25,9 @@ public static class LegacyPhysToolRunner
             foreach (var tool in ToolBaseNames)
             {
                 var before = SnapshotTxtFiles(toolsDirectory);
-                RunTool(toolsDirectory, tool);
+                var result = RunTool(toolsDirectory, tool);
                 var after = SnapshotTxtFiles(toolsDirectory);
+                var changedByTool = new List<string>();
 
                 foreach (var (path, fingerprint) in after)
                 {
@@ -34,8 +35,20 @@ public static class LegacyPhysToolRunner
                         continue;
 
                     if (!before.TryGetValue(path, out var previous) || previous != fingerprint)
+                    {
+                        changedByTool.Add(path);
                         generatedFiles.Add(path);
+                    }
                 }
+
+                // These legacy console apps generate their TXT successfully and only then call
+                // Console.ReadKey(). With redirected input ReadKey throws InvalidOperationException,
+                // producing a non-zero exit code even though the requested output is already valid.
+                // Treat that post-generation crash as success, but never hide a real failure that
+                // produced no output.
+                if (result.ExitCode != 0 && changedByTool.Count == 0)
+                    throw new InvalidOperationException(
+                        $"{tool}.exe failed with exit code {result.ExitCode}.\n{result.StandardError}\n{result.StandardOutput}".Trim());
             }
 
             return generatedFiles.ToArray();
@@ -47,7 +60,7 @@ public static class LegacyPhysToolRunner
         }
     }
 
-    private static void RunTool(string toolsDirectory, string baseName)
+    private static ToolResult RunTool(string toolsDirectory, string baseName)
     {
         var exe = Path.Combine(toolsDirectory, baseName + ".exe");
         if (!File.Exists(exe))
@@ -101,10 +114,10 @@ public static class LegacyPhysToolRunner
 
         Task.WaitAll(stdoutTask, stderrTask);
 
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"{baseName}.exe failed with exit code {process.ExitCode}.\n{stderrTask.Result}\n{stdoutTask.Result}".Trim());
+        return new ToolResult(process.ExitCode, stdoutTask.Result, stderrTask.Result);
     }
+
+    private sealed record ToolResult(int ExitCode, string StandardOutput, string StandardError);
 
     private static Dictionary<string, string> SnapshotTxtFiles(string directory)
     {
