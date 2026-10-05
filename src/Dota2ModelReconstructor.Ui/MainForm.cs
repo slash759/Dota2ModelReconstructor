@@ -13,7 +13,7 @@ public sealed class MainForm : Form
     private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
     private readonly Button openModel = new() { Text = "Abrir VMDL_C" };
     private readonly Button openVpk = new() { Text = "Abrir VPK" };
-    private readonly Button chooseOutput = new() { Text = "Salida..." };
+    private readonly Button chooseOutput = new() { Text = "Seleccionar addon..." };
     private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Dock = DockStyle.Top, Enabled = false };
     private readonly Button openOutput = new() { Text = "Abrir salida", Enabled = false };
 
@@ -41,7 +41,7 @@ public sealed class MainForm : Form
         var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
         right.Controls.Add(log);
         right.Controls.Add(decompile);
-        right.Controls.Add(new Label { Text = "Carpeta de salida", Dock = DockStyle.Top, Height = 22 });
+        right.Controls.Add(new Label { Text = "Addon de destino (content\\dota_addons\\...)", Dock = DockStyle.Top, Height = 22 });
         right.Controls.Add(outputText);
         right.Controls.Add(selectedLabel);
         right.Controls.Add(sourceLabel);
@@ -87,7 +87,7 @@ public sealed class MainForm : Form
 
     private void BrowseOutput()
     {
-        using var d = new FolderBrowserDialog { Description = "Carpeta de salida" };
+        using var d = new FolderBrowserDialog { Description = "Selecciona la carpeta raíz del addon de Dota 2" };
         if (d.ShowDialog(this) == DialogResult.OK) outputText.Text = d.SelectedPath;
     }
 
@@ -100,7 +100,6 @@ public sealed class MainForm : Form
         tree.Nodes.Clear();
         sourceLabel.Text = $"Archivo: {directModel}";
         selectedLabel.Text = $"Modelo: {Path.GetFileName(directModel)}";
-        SetDefaultOutput(directModel);
         decompile.Enabled = true;
         AppendLog($"Abierto: {directModel}");
     }
@@ -116,7 +115,6 @@ public sealed class MainForm : Form
             selectedVpkModel = null;
             sourceLabel.Text = $"VPK: {archive.FileName}";
             selectedLabel.Text = "Modelo: selecciona un .vmdl_c";
-            SetDefaultOutput(path);
             RebuildTree(search.Text);
             decompile.Enabled = false;
             AppendLog($"VPK abierto: {archive.FileName}");
@@ -191,14 +189,22 @@ public sealed class MainForm : Form
             if (directModel is not null)
             {
                 var input = directModel;
-                var output = outputText.Text;
-                result = await Task.Run(() => new VrfModelDecompiler().Decompile(input, output));
+                var addon = outputText.Text;
+                result = await Task.Run(() =>
+                {
+                    using var stream = File.OpenRead(input);
+                    using var resource = new ValveResourceFormat.Resource { FileName = input };
+                    resource.Read(stream);
+                    using var loader = new ValveResourceFormat.IO.GameFileLoader(null, input);
+                    var modelPath = Path.GetFileName(input);
+                    return new AddonModelDecompiler().Decompile(resource, loader, modelPath, addon);
+                });
             }
             else if (archive is not null && selectedVpkModel is not null)
             {
                 var model = selectedVpkModel;
-                var output = outputText.Text;
-                result = await Task.Run(() => archive.Decompile(model, output));
+                var addon = outputText.Text;
+                result = await Task.Run(() => archive.Decompile(model, addon));
             }
             else return;
 
@@ -206,7 +212,7 @@ public sealed class MainForm : Form
             AppendLog($"GLTF: {result.GltfPath}");
             AppendLog("OK");
             openOutput.Enabled = true;
-            MessageBox.Show(this, "VMDL y GLTF generados.", "Terminado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "VMDL, GLTF y DMX generados dentro del addon.", "Terminado", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
@@ -224,12 +230,6 @@ public sealed class MainForm : Form
         tree.Enabled = enabled;
         search.Enabled = enabled;
         decompile.Enabled = enabled && (directModel is not null || selectedVpkModel is not null);
-    }
-
-    private void SetDefaultOutput(string source)
-    {
-        var dir = Path.GetDirectoryName(Path.GetFullPath(source))!;
-        outputText.Text = Path.Combine(dir, "Dota2ModelReconstructor_Output");
     }
 
     private void OpenOutputFolder()
