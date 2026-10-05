@@ -55,7 +55,8 @@ public sealed class AddonModelDecompiler
 
         // Keep the GLTF next to the decompiled VMDL; DMX files instead live at the
         // source_filename locations expected by ModelDoc.
-        var gltfPath = Path.ChangeExtension(vmdlPath, ".gltf");
+        var gltfPath = Path.Combine(Path.GetDirectoryName(vmdlPath)!, "blenderFiles", Path.GetFileNameWithoutExtension(vmdlPath) + ".gltf");
+        Directory.CreateDirectory(Path.GetDirectoryName(gltfPath)!);
         var exporter = new GltfModelExporter(fileLoader)
         {
             ProgressReporter = new Progress<string>(_ => { }),
