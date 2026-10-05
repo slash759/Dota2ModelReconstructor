@@ -5,6 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ValveResourceFormat" Version="19.2.6339" />
+    <ProjectReference Include="..\..\third_party\ValveResourceFormat\ValveResourceFormat\ValveResourceFormat.csproj" />
   </ItemGroup>
 </Project>
