@@ -16,6 +16,11 @@ jobs:
       - run: dotnet restore Dota2ModelReconstructor.slnx
       - run: dotnet build Dota2ModelReconstructor.slnx --configuration Release --no-restore
       - run: dotnet publish src/Dota2ModelReconstructor.Cli/Dota2ModelReconstructor.Cli.csproj --configuration Release --no-build --output artifacts/Dota2ModelReconstructor
+      - run: dotnet publish src/Dota2ModelReconstructor.Ui/Dota2ModelReconstructor.Ui.csproj --configuration Release --no-build --output artifacts/Dota2ModelReconstructor-UI
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dota2ModelReconstructor-UI-windows
+          path: artifacts/Dota2ModelReconstructor-UI
       - uses: actions/upload-artifact@v4
         with:
           name: Dota2ModelReconstructor-windows
