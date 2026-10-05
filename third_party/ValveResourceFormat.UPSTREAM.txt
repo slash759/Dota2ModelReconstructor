@@ -1,0 +1,4 @@
+Upstream: https://github.com/ValveResourceFormat/ValveResourceFormat
+Tag: 19.2
+Commit: c72208352f5bf62f1482447ed166c548f303f8fa
+Vendored as an unmodified snapshot; .git metadata omitted.
