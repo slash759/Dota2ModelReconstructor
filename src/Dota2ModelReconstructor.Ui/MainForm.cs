@@ -64,6 +64,7 @@ public sealed class MainForm : Form
         DragDrop += OnDragDrop;
 
         AppendLog("Motor: Source 2 Viewer / ValveResourceFormat 19.2 vendorizado");
+        AppendLog("Powered by Source 2 Viewer (ValveResourceFormat) - https://s2v.app");
         AppendLog("Puedes abrir/arrastrar un .vmdl_c o navegar pak01_dir.vpk.");
     }
 
