@@ -16,6 +16,7 @@ public sealed class MainForm : Form
     private readonly Button chooseOutput = new() { Text = "Seleccionar addon..." };
     private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Dock = DockStyle.Top, Enabled = false };
     private readonly Button openOutput = new() { Text = "Abrir salida", Enabled = false };
+    private readonly Button generateCapsules = new() { Text = "Probar PHYS / Generar cápsulas" };
 
     private VpkModelArchive? archive;
     private string? directModel;
@@ -31,7 +32,7 @@ public sealed class MainForm : Form
         AllowDrop = true;
 
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(6) };
-        toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput]);
+        toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput, generateCapsules]);
 
         var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
         left.Controls.Add(tree);
@@ -57,6 +58,7 @@ public sealed class MainForm : Form
         openVpk.Click += (_, _) => BrowseVpk();
         chooseOutput.Click += (_, _) => BrowseOutput();
         openOutput.Click += (_, _) => OpenOutputFolder();
+        generateCapsules.Click += async (_, _) => await GenerateCapsulesAsync();
         decompile.Click += async (_, _) => await DecompileAsync();
         tree.AfterSelect += (_, e) => SelectTreeModel(e.Node);
         search.TextChanged += (_, _) => RebuildTree(search.Text);
@@ -221,6 +223,39 @@ public sealed class MainForm : Form
             MessageBox.Show(this, ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally { ToggleUi(true); }
+    }
+
+    private async Task GenerateCapsulesAsync()
+    {
+        using var d = new OpenFileDialog
+        {
+            Filter = "PHYS dump (*.txt)|*.txt",
+            Title = "Selecciona phys.txt",
+            FileName = "phys.txt"
+        };
+        if (d.ShowDialog(this) != DialogResult.OK) return;
+
+        generateCapsules.Enabled = false;
+        AppendLog($"Probando helpers PHYS con: {d.FileName}");
+
+        try
+        {
+            var results = await Task.Run(() => LegacyPhysToolRunner.Run(d.FileName));
+            if (results.Count == 0)
+                AppendLog("Los EXE terminaron, pero no se detectaron TXT nuevos.");
+            else
+                foreach (var result in results) AppendLog($"TXT generado: {result}");
+
+            MessageBox.Show(this,
+                results.Count == 0 ? "Los helpers terminaron sin TXT nuevos." : $"Helpers terminados. TXT generados: {results.Count}",
+                "Prueba PHYS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"ERROR PHYS: {ex}");
+            MessageBox.Show(this, ex.Message, "Error PHYS", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally { generateCapsules.Enabled = true; }
     }
 
     private void ToggleUi(bool enabled)
