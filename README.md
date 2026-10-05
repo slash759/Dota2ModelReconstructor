@@ -21,3 +21,5 @@ ValveResourceFormat is Copyright (c) ValveResourceFormat Contributors and is dis
 ## Scope
 
 Blender automation, Dota 2 Workshop Tools automation, PHYS helpers, and morph helpers are deliberately outside this first phase.
+
+Powered by [Source 2 Viewer](https://s2v.app) ([ValveResourceFormat](https://github.com/ValveResourceFormat/ValveResourceFormat)).
