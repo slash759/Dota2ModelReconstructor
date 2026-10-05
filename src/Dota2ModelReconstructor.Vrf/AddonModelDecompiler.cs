@@ -92,42 +92,69 @@ public sealed class AddonModelDecompiler
 
     private static void AppendRootChildren(string vmdlPath, IEnumerable<string> helperOutputs)
     {
-        var snippets = helperOutputs
-            .Where(File.Exists)
-            .Where(path =>
-            {
-                var name = Path.GetFileName(path);
-                return name.Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase)
-                    || name.Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase);
-            })
-            .Select(File.ReadAllText)
-            .Where(text => !string.IsNullOrWhiteSpace(text))
-            .ToArray();
+        var outputs = helperOutputs.Where(File.Exists).ToArray();
+        var shapePath = outputs.FirstOrDefault(path =>
+            Path.GetFileName(path).Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase));
+        var effectsPath = outputs.FirstOrDefault(path =>
+            Path.GetFileName(path).Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase));
 
-        if (snippets.Length == 0)
+        if (shapePath is null && effectsPath is null)
             return;
 
         var vmdl = File.ReadAllText(vmdlPath);
-        var childrenToken = "children =";
-        var childrenIndex = vmdl.IndexOf(childrenToken, StringComparison.Ordinal);
+        var rootChildren = FindChildrenArray(vmdl, 0, "RootNode");
+
+        // ClothShapeList is a direct child of RootNode.
+        if (shapePath is not null)
+            vmdl = InsertArrayChild(vmdl, rootChildren.Start, rootChildren.End, File.ReadAllText(shapePath));
+
+        // cloth_effects_vmdl.txt is the Folder named clothEffects. It belongs inside
+        // Softbody.children, never directly inside RootNode.children.
+        if (effectsPath is not null)
+        {
+            var softbodyIndex = vmdl.IndexOf("_class = \"Softbody\"", StringComparison.Ordinal);
+            if (softbodyIndex < 0)
+                throw new InvalidDataException(
+                    "clothEffect generated output, but the VMDL has no Softbody node to receive it.");
+
+            var softbodyChildren = FindChildrenArray(vmdl, softbodyIndex, "Softbody");
+            vmdl = InsertArrayChild(vmdl, softbodyChildren.Start, softbodyChildren.End, File.ReadAllText(effectsPath));
+        }
+
+        File.WriteAllText(vmdlPath, vmdl, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static (int Start, int End) FindChildrenArray(string text, int searchStart, string owner)
+    {
+        var childrenIndex = text.IndexOf("children =", searchStart, StringComparison.Ordinal);
         if (childrenIndex < 0)
-            throw new InvalidDataException("Could not locate RootNode.children in the generated VMDL.");
+            throw new InvalidDataException($"Could not locate {owner}.children.");
 
-        var arrayStart = vmdl.IndexOf('[', childrenIndex + childrenToken.Length);
+        var arrayStart = text.IndexOf('[', childrenIndex);
         if (arrayStart < 0)
-            throw new InvalidDataException("Could not locate the RootNode.children array.");
+            throw new InvalidDataException($"Could not locate the {owner}.children array.");
 
-        var arrayEnd = FindMatchingBracket(vmdl, arrayStart);
-        var indentStart = vmdl.LastIndexOf('\n', arrayStart);
-        var propertyIndent = indentStart < 0 ? string.Empty : vmdl[(indentStart + 1)..arrayStart];
+        return (arrayStart, FindMatchingBracket(text, arrayStart));
+    }
+
+    private static string InsertArrayChild(string text, int arrayStart, int arrayEnd, string snippet)
+    {
+        if (string.IsNullOrWhiteSpace(snippet))
+            return text;
+
+        var lineStart = text.LastIndexOf('\n', arrayStart);
+        var propertyIndent = lineStart < 0 ? string.Empty : text[(lineStart + 1)..arrayStart];
         propertyIndent = new string(propertyIndent.TakeWhile(char.IsWhiteSpace).ToArray());
         var childIndent = propertyIndent + "    ";
 
-        var insertion = string.Concat(snippets.Select(snippet =>
-            Environment.NewLine + IndentSnippet(snippet.Trim(), childIndent) + ","));
+        var insertion =
+            Environment.NewLine +
+            IndentSnippet(snippet.Trim(), childIndent) +
+            "," +
+            Environment.NewLine +
+            propertyIndent;
 
-        vmdl = vmdl.Insert(arrayEnd, insertion + Environment.NewLine + propertyIndent);
-        File.WriteAllText(vmdlPath, vmdl, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return text.Insert(arrayEnd, insertion);
     }
 
     private static int FindMatchingBracket(string text, int openIndex)
