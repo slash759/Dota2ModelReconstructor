@@ -8,4 +8,11 @@
   <ItemGroup>
     <ProjectReference Include="../Dota2ModelReconstructor.Vrf/Dota2ModelReconstructor.Vrf.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\\..\\tools\\legacy\\phys\\**\\*">
+      <Link>tools\\legacy\\phys\\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
