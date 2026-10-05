@@ -8,7 +8,7 @@ public static class LegacyPhysToolRunner
     private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect"];
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
-    public static IReadOnlyList<string> Run(string sourcePhysPath, string? destinationDirectory = null)
+    public static IReadOnlyList<string> Run(string sourcePhysPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePhysPath);
         if (!File.Exists(sourcePhysPath))
@@ -51,34 +51,42 @@ public static class LegacyPhysToolRunner
                         $"{tool}.exe failed with exit code {result.ExitCode}.\n{result.StandardError}\n{result.StandardOutput}".Trim());
             }
 
-            var outputs = generatedFiles.ToArray();
-
-            if (!string.IsNullOrWhiteSpace(destinationDirectory))
-            {
-                Directory.CreateDirectory(destinationDirectory);
-                var preservedOutputs = new List<string>();
-                foreach (var output in outputs)
-                {
-                    var destination = Path.Combine(destinationDirectory, Path.GetFileName(output));
-                    File.Copy(output, destination, overwrite: true);
-                    preservedOutputs.Add(destination);
-                }
-                return preservedOutputs;
-            }
-
-            return outputs;
+            return generatedFiles.ToArray();
         }
-        finally
+        catch
         {
-            foreach (var temporaryName in new[] { "phys.txt", "cloth_shapes.vmdl.txt", "cloth_effects_vmdl.txt" })
+            CleanupTemporaryFiles(toolsDirectory);
+            throw;
+        }
+    }
+
+    public static void CleanupGeneratedFiles(IEnumerable<string> generatedFiles)
+    {
+        foreach (var path in generatedFiles)
+        {
+            try { if (File.Exists(path)) File.Delete(path); }
+            catch { /* Best-effort cleanup. */ }
+        }
+
+        try
+        {
+            var toolsDirectory = FindToolsDirectory();
+            var physPath = Path.Combine(toolsDirectory, "phys.txt");
+            if (File.Exists(physPath)) File.Delete(physPath);
+        }
+        catch { /* Best-effort cleanup. */ }
+    }
+
+    private static void CleanupTemporaryFiles(string toolsDirectory)
+    {
+        foreach (var temporaryName in new[] { "phys.txt", "cloth_shapes.vmdl.txt", "cloth_effects_vmdl.txt" })
+        {
+            try
             {
-                try
-                {
-                    var temporaryPath = Path.Combine(toolsDirectory, temporaryName);
-                    if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
-                }
-                catch { /* Best-effort cleanup. */ }
+                var temporaryPath = Path.Combine(toolsDirectory, temporaryName);
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
             }
+            catch { /* Best-effort cleanup. */ }
         }
     }
 
