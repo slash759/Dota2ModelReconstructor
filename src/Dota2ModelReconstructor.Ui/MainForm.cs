@@ -5,159 +5,251 @@ namespace Dota2ModelReconstructor.Ui;
 
 public sealed class MainForm : Form
 {
-    private readonly TextBox inputText = new() { Dock = DockStyle.Fill, ReadOnly = true };
-    private readonly TextBox outputText = new() { Dock = DockStyle.Fill, ReadOnly = true };
-    private readonly Button browseInput = new() { Text = "Seleccionar VMDL_C...", AutoSize = true };
-    private readonly Button browseOutput = new() { Text = "Carpeta de salida...", AutoSize = true };
-    private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 46, Dock = DockStyle.Top };
-    private readonly Button openOutput = new() { Text = "Abrir carpeta de salida", AutoSize = true, Enabled = false };
-    private readonly TextBox log = new()
-    {
-        Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
-        ScrollBars = ScrollBars.Vertical
-    };
+    private readonly TreeView tree = new() { Dock = DockStyle.Fill, HideSelection = false };
+    private readonly TextBox search = new() { Dock = DockStyle.Top, PlaceholderText = "Buscar modelo..." };
+    private readonly Label sourceLabel = new() { Dock = DockStyle.Top, AutoEllipsis = true, Height = 38, Text = "Arrastra un .vmdl_c o pak01_dir.vpk aquí" };
+    private readonly Label selectedLabel = new() { Dock = DockStyle.Top, AutoEllipsis = true, Height = 42, Text = "Modelo: ninguno" };
+    private readonly TextBox outputText = new() { Dock = DockStyle.Top, ReadOnly = true };
+    private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+    private readonly Button openModel = new() { Text = "Abrir VMDL_C" };
+    private readonly Button openVpk = new() { Text = "Abrir VPK" };
+    private readonly Button chooseOutput = new() { Text = "Salida..." };
+    private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Dock = DockStyle.Top, Enabled = false };
+    private readonly Button openOutput = new() { Text = "Abrir salida", Enabled = false };
+
+    private VpkModelArchive? archive;
+    private string? directModel;
+    private string? selectedVpkModel;
 
     public MainForm()
     {
-        Text = "Dota 2 Model Reconstructor";
-        Width = 820;
-        Height = 520;
-        MinimumSize = new Size(680, 420);
+        Text = "Dota 2 Model Reconstructor - S2V 19.2";
+        Width = 1050;
+        Height = 680;
+        MinimumSize = new Size(800, 500);
         StartPosition = FormStartPosition.CenterScreen;
+        AllowDrop = true;
 
-        var grid = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(12),
-            ColumnCount = 2,
-            RowCount = 6
-        };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(6) };
+        toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput]);
 
-        grid.Controls.Add(new Label { Text = "Modelo compilado (.vmdl_c)", AutoSize = true }, 0, 0);
-        grid.SetColumnSpan(grid.Controls[^1], 2);
-        grid.Controls.Add(inputText, 0, 1);
-        grid.Controls.Add(browseInput, 1, 1);
+        var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
+        left.Controls.Add(tree);
+        left.Controls.Add(search);
+        left.Controls.Add(new Label { Text = "Modelos del VPK", Dock = DockStyle.Top, Height = 24 });
 
-        grid.Controls.Add(new Label { Text = "Carpeta de salida", AutoSize = true, Margin = new Padding(0, 12, 0, 3) }, 0, 2);
-        grid.SetColumnSpan(grid.Controls[^1], 2);
-        grid.Controls.Add(outputText, 0, 3);
-        grid.Controls.Add(browseOutput, 1, 3);
+        var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
+        right.Controls.Add(log);
+        right.Controls.Add(decompile);
+        right.Controls.Add(new Label { Text = "Carpeta de salida", Dock = DockStyle.Top, Height = 22 });
+        right.Controls.Add(outputText);
+        right.Controls.Add(selectedLabel);
+        right.Controls.Add(sourceLabel);
 
-        var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
-        actions.Controls.Add(openOutput);
-        grid.Controls.Add(actions, 0, 4);
-        grid.Controls.Add(decompile, 1, 4);
+        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 430 };
+        split.Panel1.Controls.Add(left);
+        split.Panel2.Controls.Add(right);
 
-        grid.Controls.Add(log, 0, 5);
-        grid.SetColumnSpan(log, 2);
-        Controls.Add(grid);
+        Controls.Add(split);
+        Controls.Add(toolbar);
 
-        browseInput.Click += SelectInput;
-        browseOutput.Click += SelectOutput;
-        decompile.Click += async (_, _) => await DecompileAsync();
+        openModel.Click += (_, _) => BrowseModel();
+        openVpk.Click += (_, _) => BrowseVpk();
+        chooseOutput.Click += (_, _) => BrowseOutput();
         openOutput.Click += (_, _) => OpenOutputFolder();
+        decompile.Click += async (_, _) => await DecompileAsync();
+        tree.AfterSelect += (_, e) => SelectTreeModel(e.Node);
+        search.TextChanged += (_, _) => RebuildTree(search.Text);
+        DragEnter += OnDragEnter;
+        DragDrop += OnDragDrop;
 
-        AppendLog("S2V / ValveResourceFormat compatibility target: 19.2");
-        AppendLog("Etapa temporal: VMDL_C -> VMDL + GLTF");
+        AppendLog("Motor: Source 2 Viewer / ValveResourceFormat 19.2 vendorizado");
+        AppendLog("Puedes abrir/arrastrar un .vmdl_c o navegar pak01_dir.vpk.");
     }
 
-    private void SelectInput(object? sender, EventArgs e)
+    protected override void Dispose(bool disposing)
     {
-        using var dialog = new OpenFileDialog
-        {
-            Filter = "Source 2 compiled model (*.vmdl_c)|*.vmdl_c|All files (*.*)|*.*",
-            Title = "Seleccionar modelo compilado"
-        };
+        if (disposing) archive?.Dispose();
+        base.Dispose(disposing);
+    }
 
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+    private void BrowseModel()
+    {
+        using var d = new OpenFileDialog { Filter = "Compiled model (*.vmdl_c)|*.vmdl_c", Title = "Abrir VMDL_C" };
+        if (d.ShowDialog(this) == DialogResult.OK) LoadDirectModel(d.FileName);
+    }
 
-        inputText.Text = dialog.FileName;
-        if (string.IsNullOrWhiteSpace(outputText.Text))
+    private void BrowseVpk()
+    {
+        using var d = new OpenFileDialog { Filter = "Valve package (*.vpk)|*.vpk", Title = "Abrir VPK de Dota 2" };
+        if (d.ShowDialog(this) == DialogResult.OK) LoadVpk(d.FileName);
+    }
+
+    private void BrowseOutput()
+    {
+        using var d = new FolderBrowserDialog { Description = "Carpeta de salida" };
+        if (d.ShowDialog(this) == DialogResult.OK) outputText.Text = d.SelectedPath;
+    }
+
+    private void LoadDirectModel(string path)
+    {
+        archive?.Dispose();
+        archive = null;
+        selectedVpkModel = null;
+        directModel = Path.GetFullPath(path);
+        tree.Nodes.Clear();
+        sourceLabel.Text = $"Archivo: {directModel}";
+        selectedLabel.Text = $"Modelo: {Path.GetFileName(directModel)}";
+        SetDefaultOutput(directModel);
+        decompile.Enabled = true;
+        AppendLog($"Abierto: {directModel}");
+    }
+
+    private void LoadVpk(string path)
+    {
+        try
         {
-            var dir = Path.GetDirectoryName(dialog.FileName)!;
-            var name = Path.GetFileNameWithoutExtension(dialog.FileName);
-            outputText.Text = Path.Combine(dir, name + "_decompiled");
+            Cursor = Cursors.WaitCursor;
+            archive?.Dispose();
+            archive = new VpkModelArchive(path);
+            directModel = null;
+            selectedVpkModel = null;
+            sourceLabel.Text = $"VPK: {archive.FileName}";
+            selectedLabel.Text = "Modelo: selecciona un .vmdl_c";
+            SetDefaultOutput(path);
+            RebuildTree(search.Text);
+            decompile.Enabled = false;
+            AppendLog($"VPK abierto: {archive.FileName}");
+            AppendLog($"Modelos VMDL_C encontrados: {archive.Models.Count:N0}");
         }
+        catch (Exception ex)
+        {
+            archive?.Dispose();
+            archive = null;
+            MessageBox.Show(this, ex.Message, "No se pudo abrir el VPK", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"ERROR VPK: {ex}");
+        }
+        finally { Cursor = Cursors.Default; }
     }
 
-    private void SelectOutput(object? sender, EventArgs e)
+    private void RebuildTree(string filter)
     {
-        using var dialog = new FolderBrowserDialog { Description = "Seleccionar carpeta de salida" };
-        if (dialog.ShowDialog(this) == DialogResult.OK)
-            outputText.Text = dialog.SelectedPath;
+        tree.BeginUpdate();
+        tree.Nodes.Clear();
+        if (archive is null) { tree.EndUpdate(); return; }
+
+        var paths = string.IsNullOrWhiteSpace(filter)
+            ? archive.Models
+            : archive.Models.Where(x => x.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+        foreach (var path in paths)
+            AddPath(path);
+
+        tree.EndUpdate();
+    }
+
+    private void AddPath(string path)
+    {
+        var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        TreeNodeCollection nodes = tree.Nodes;
+        TreeNode? node = null;
+
+        for (var i = 0; i < parts.Length; i++)
+        {
+            node = nodes.Cast<TreeNode>().FirstOrDefault(n => n.Text.Equals(parts[i], StringComparison.OrdinalIgnoreCase));
+            if (node is null)
+            {
+                node = new TreeNode(parts[i]);
+                nodes.Add(node);
+            }
+            nodes = node.Nodes;
+        }
+
+        if (node is not null) node.Tag = path;
+    }
+
+    private void SelectTreeModel(TreeNode node)
+    {
+        if (node.Tag is not string path || !path.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase)) return;
+        selectedVpkModel = path;
+        selectedLabel.Text = $"Modelo: {path}";
+        decompile.Enabled = archive is not null;
     }
 
     private async Task DecompileAsync()
     {
-        if (!File.Exists(inputText.Text))
-        {
-            MessageBox.Show(this, "Selecciona un archivo .vmdl_c válido.", "Falta el modelo",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(outputText.Text))
-        {
-            MessageBox.Show(this, "Selecciona una carpeta de salida.", "Falta la salida",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(outputText.Text)) BrowseOutput();
+        if (string.IsNullOrWhiteSpace(outputText.Text)) return;
 
         ToggleUi(false);
-        log.Clear();
-        AppendLog($"Entrada: {inputText.Text}");
-        AppendLog($"Salida : {outputText.Text}");
+        openOutput.Enabled = false;
         AppendLog("Descompilando...");
 
         try
         {
-            var input = inputText.Text;
-            var output = outputText.Text;
-            var result = await Task.Run(() => new VrfModelDecompiler().Decompile(input, output));
+            DecompileResult result;
+            if (directModel is not null)
+            {
+                var input = directModel;
+                var output = outputText.Text;
+                result = await Task.Run(() => new VrfModelDecompiler().Decompile(input, output));
+            }
+            else if (archive is not null && selectedVpkModel is not null)
+            {
+                var model = selectedVpkModel;
+                var output = outputText.Text;
+                result = await Task.Run(() => archive.Decompile(model, output));
+            }
+            else return;
 
-            AppendLog("");
-            AppendLog("OK");
             AppendLog($"VMDL: {result.VmdlPath}");
             AppendLog($"GLTF: {result.GltfPath}");
+            AppendLog("OK");
             openOutput.Enabled = true;
-
-            MessageBox.Show(this, "Descompilación terminada.", "Dota 2 Model Reconstructor",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "VMDL y GLTF generados.", "Terminado", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            AppendLog("");
-            AppendLog("ERROR:");
-            AppendLog(ex.ToString());
-            MessageBox.Show(this, ex.Message, "Error al descompilar",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AppendLog($"ERROR: {ex}");
+            MessageBox.Show(this, ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally
-        {
-            ToggleUi(true);
-        }
+        finally { ToggleUi(true); }
     }
 
     private void ToggleUi(bool enabled)
     {
-        browseInput.Enabled = enabled;
-        browseOutput.Enabled = enabled;
-        decompile.Enabled = enabled;
+        openModel.Enabled = enabled;
+        openVpk.Enabled = enabled;
+        chooseOutput.Enabled = enabled;
+        tree.Enabled = enabled;
+        search.Enabled = enabled;
+        decompile.Enabled = enabled && (directModel is not null || selectedVpkModel is not null);
+    }
+
+    private void SetDefaultOutput(string source)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(source))!;
+        outputText.Text = Path.Combine(dir, "Dota2ModelReconstructor_Output");
     }
 
     private void OpenOutputFolder()
     {
-        if (!Directory.Exists(outputText.Text)) return;
-        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{outputText.Text}\"") { UseShellExecute = true });
+        if (Directory.Exists(outputText.Text))
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{outputText.Text}\"") { UseShellExecute = true });
     }
 
-    private void AppendLog(string text) => log.AppendText(text + Environment.NewLine);
+    private void OnDragEnter(object? sender, DragEventArgs e)
+    {
+        if (e.Data?.GetDataPresent(DataFormats.FileDrop) == true) e.Effect = DragDropEffects.Copy;
+    }
+
+    private void OnDragDrop(object? sender, DragEventArgs e)
+    {
+        if (e.Data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0) return;
+        var path = files[0];
+        if (path.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase)) LoadDirectModel(path);
+        else if (path.EndsWith(".vpk", StringComparison.OrdinalIgnoreCase)) LoadVpk(path);
+    }
+
+    private void AppendLog(string value) => log.AppendText(value + Environment.NewLine);
 }
