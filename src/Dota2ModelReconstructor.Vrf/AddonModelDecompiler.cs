@@ -43,7 +43,11 @@ public sealed class AddonModelDecompiler
             Directory.CreateDirectory(reconstructionDirectory);
 
             var physPath = Path.Combine(reconstructionDirectory, "phys.txt");
-            File.WriteAllText(physPath, physBlock.ToString(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            // S2V's text viewer renders each indentation level as four spaces. VRF's
+            // IndentedTextWriter uses tabs internally, so normalize only indentation;
+            // the PHYS values and KV3 structure remain untouched.
+            var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
+            File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         }
 
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
