@@ -1,0 +1,43 @@
+name: vendor-s2v-19.2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone exact Source 2 Viewer 19.2 snapshot
+        run: |
+          rm -rf /tmp/vrf
+          git clone https://github.com/ValveResourceFormat/ValveResourceFormat.git /tmp/vrf
+          cd /tmp/vrf
+          git checkout c72208352f5bf62f1482447ed166c548f303f8fa
+          test "$(git rev-parse HEAD)" = "c72208352f5bf62f1482447ed166c548f303f8fa"
+
+      - name: Vendor snapshot under third_party
+        run: |
+          rm -rf third_party/ValveResourceFormat
+          mkdir -p third_party/ValveResourceFormat
+          cp -a /tmp/vrf/. third_party/ValveResourceFormat/
+          rm -rf third_party/ValveResourceFormat/.git
+          printf '%s\n'             'Upstream: https://github.com/ValveResourceFormat/ValveResourceFormat'             'Tag: 19.2'             'Commit: c72208352f5bf62f1482447ed166c548f303f8fa'             'Vendored as an unmodified snapshot; .git metadata omitted.'             > third_party/ValveResourceFormat.UPSTREAM.txt
+
+      - name: Commit vendored snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A third_party/ValveResourceFormat third_party/ValveResourceFormat.UPSTREAM.txt
+          if git diff --cached --quiet; then
+            echo "Snapshot already matches 19.2."
+            exit 0
+          fi
+          git commit -m "Vendor exact Source 2 Viewer 19.2 snapshot"
+          git push
