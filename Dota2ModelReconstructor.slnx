@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Dota2ModelReconstructor.Vrf/Dota2ModelReconstructor.Vrf.csproj" />
     <Project Path="src/Dota2ModelReconstructor.Cli/Dota2ModelReconstructor.Cli.csproj" />
+    <Project Path="src/Dota2ModelReconstructor.Ui/Dota2ModelReconstructor.Ui.csproj" />
   </Folder>
 </Solution>
