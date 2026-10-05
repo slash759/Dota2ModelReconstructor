@@ -114,8 +114,13 @@ public sealed class AddonModelDecompiler
         {
             var softbodyIndex = vmdl.IndexOf("_class = \"Softbody\"", StringComparison.Ordinal);
             if (softbodyIndex < 0)
-                throw new InvalidDataException(
-                    "clothEffect generated output, but the VMDL has no Softbody node to receive it.");
+            {
+                // S2V cannot reconstruct this source-only node from the compiled resource,
+                // so create the standard Softbody container first.
+                rootChildren = FindChildrenArray(vmdl, 0, "RootNode");
+                vmdl = InsertArrayChild(vmdl, rootChildren.Start, rootChildren.End, CreateSoftbodyNode());
+                softbodyIndex = vmdl.IndexOf("_class = \"Softbody\"", StringComparison.Ordinal);
+            }
 
             var softbodyChildren = FindChildrenArray(vmdl, softbodyIndex, "Softbody");
             vmdl = InsertArrayChild(vmdl, softbodyChildren.Start, softbodyChildren.End, File.ReadAllText(effectsPath));
@@ -123,6 +128,27 @@ public sealed class AddonModelDecompiler
 
         File.WriteAllText(vmdlPath, vmdl, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
+
+    private static string CreateSoftbodyNode() =>
+        """
+        {
+            _class = "Softbody"
+            children =
+            [
+                {
+                    _class = "ClothEffectFolder"
+                    are_effects_mutually_exclude = true
+                },
+            ]
+            stiffness_on_ragdoll = 0.0
+            motion_smooth_cdt = 0.0
+            cloth_sleep_enabled = false
+            cloth_immovable_hint = false
+            cloth_per_bone_scale_enabled = false
+            cloth_enable_empty_model = false
+            cloth_keychain_motion = false
+        }
+        """;
 
     private static (int Start, int End) FindChildrenArray(string text, int searchStart, string owner)
     {
