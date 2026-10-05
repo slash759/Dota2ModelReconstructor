@@ -11,26 +11,27 @@ public sealed class VrfModelDecompiler
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
 
         inputPath = Path.GetFullPath(inputPath);
-        outputDirectory = Path.GetFullPath(outputDirectory);
-
         if (!File.Exists(inputPath))
             throw new FileNotFoundException("The compiled VMDL was not found.", inputPath);
-
         if (!inputPath.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Input must be a .vmdl_c file.", nameof(inputPath));
-
-        Directory.CreateDirectory(outputDirectory);
 
         using var stream = File.OpenRead(inputPath);
         using var resource = new Resource { FileName = inputPath };
         resource.Read(stream);
+        using var fileLoader = new GameFileLoader(null, inputPath);
+        return DecompileResource(resource, fileLoader, Path.GetFileName(inputPath), outputDirectory);
+    }
 
+    public DecompileResult DecompileResource(Resource resource, IFileLoader fileLoader, string sourceName, string outputDirectory)
+    {
         if (resource.ResourceType != ResourceType.Model)
             throw new InvalidDataException($"Expected a model resource, got {resource.ResourceType}.");
 
-        using var fileLoader = new GameFileLoader(null, inputPath);
+        outputDirectory = Path.GetFullPath(outputDirectory);
+        Directory.CreateDirectory(outputDirectory);
 
-        var baseName = Path.GetFileNameWithoutExtension(inputPath);
+        var baseName = Path.GetFileNameWithoutExtension(sourceName);
         if (baseName.EndsWith(".vmdl", StringComparison.OrdinalIgnoreCase))
             baseName = baseName[..^5];
 
@@ -55,18 +56,14 @@ public sealed class VrfModelDecompiler
             throw new InvalidDataException("VRF did not produce VMDL text for this model.");
 
         File.WriteAllBytes(targetPath, content.Data);
-
-        var directory = Path.GetDirectoryName(targetPath)!;
-        WriteSubFiles(content, directory);
+        WriteSubFiles(content, Path.GetDirectoryName(targetPath)!);
     }
 
     private static void WriteSubFiles(ContentFile content, string directory)
     {
         foreach (var subFile in content.SubFiles)
         {
-            if (subFile.Extract is null)
-                continue;
-
+            if (subFile.Extract is null) continue;
             var path = Path.Combine(directory, subFile.FileName);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, subFile.Extract());
@@ -74,9 +71,7 @@ public sealed class VrfModelDecompiler
 
         foreach (var additional in content.AdditionalFiles)
         {
-            if (additional.Data is null || string.IsNullOrWhiteSpace(additional.FileName))
-                continue;
-
+            if (additional.Data is null || string.IsNullOrWhiteSpace(additional.FileName)) continue;
             var path = Path.Combine(directory, additional.FileName);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, additional.Data);
