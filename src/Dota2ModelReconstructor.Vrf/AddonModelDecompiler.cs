@@ -36,21 +36,32 @@ public sealed class AddonModelDecompiler
         var physBlock = resource.GetBlockByType(BlockType.PHYS);
         if (physBlock is not null)
         {
-            var reconstructionDirectory = Path.Combine(
-                Path.GetDirectoryName(vmdlPath)!,
-                "reconstruction",
-                Path.GetFileNameWithoutExtension(vmdlPath));
-            Directory.CreateDirectory(reconstructionDirectory);
+            var physPath = Path.Combine(Path.GetTempPath(), $"Dota2ModelReconstructor-{Guid.NewGuid():N}-phys.txt");
+            try
+            {
+                // S2V's text viewer renders each indentation level as four spaces. VRF's
+                // IndentedTextWriter uses tabs internally, so normalize only indentation;
+                // the PHYS values and KV3 structure remain untouched.
+                var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
+                File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-            var physPath = Path.Combine(reconstructionDirectory, "phys.txt");
-            // S2V's text viewer renders each indentation level as four spaces. VRF's
-            // IndentedTextWriter uses tabs internally, so normalize only indentation;
-            // the PHYS values and KV3 structure remain untouched.
-            var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
-            File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            var helperOutputs = LegacyPhysToolRunner.Run(physPath, reconstructionDirectory);
-            AppendRootChildren(vmdlPath, helperOutputs);
+                var helperOutputs = LegacyPhysToolRunner.Run(physPath);
+                try
+                {
+                    // Read and merge the helper outputs while they still exist beside the
+                    // permanent tools. Only after the VMDL is written do we remove them.
+                    AppendRootChildren(vmdlPath, helperOutputs);
+                }
+                finally
+                {
+                    LegacyPhysToolRunner.CleanupGeneratedFiles(helperOutputs);
+                }
+            }
+            finally
+            {
+                try { if (File.Exists(physPath)) File.Delete(physPath); }
+                catch { /* Best-effort cleanup. */ }
+            }
         }
 
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
