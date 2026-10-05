@@ -48,6 +48,11 @@ public sealed class AddonModelDecompiler
             // the PHYS values and KV3 structure remain untouched.
             var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
             File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            // Reconstruct the source-only cloth nodes from PHYS and append them to the
+            // RootNode.children array in the generated VMDL.
+            var helperOutputs = LegacyPhysToolRunner.Run(physPath, reconstructionDirectory);
+            AppendRootChildren(vmdlPath, helperOutputs);
         }
 
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
@@ -84,6 +89,77 @@ public sealed class AddonModelDecompiler
 
         return new DecompileResult(vmdlPath, gltfPath);
     }
+
+    private static void AppendRootChildren(string vmdlPath, IEnumerable<string> helperOutputs)
+    {
+        var snippets = helperOutputs
+            .Where(File.Exists)
+            .Where(path =>
+            {
+                var name = Path.GetFileName(path);
+                return name.Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase)
+                    || name.Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase);
+            })
+            .Select(File.ReadAllText)
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .ToArray();
+
+        if (snippets.Length == 0)
+            return;
+
+        var vmdl = File.ReadAllText(vmdlPath);
+        var childrenToken = "children =";
+        var childrenIndex = vmdl.IndexOf(childrenToken, StringComparison.Ordinal);
+        if (childrenIndex < 0)
+            throw new InvalidDataException("Could not locate RootNode.children in the generated VMDL.");
+
+        var arrayStart = vmdl.IndexOf('[', childrenIndex + childrenToken.Length);
+        if (arrayStart < 0)
+            throw new InvalidDataException("Could not locate the RootNode.children array.");
+
+        var arrayEnd = FindMatchingBracket(vmdl, arrayStart);
+        var indentStart = vmdl.LastIndexOf('\n', arrayStart);
+        var propertyIndent = indentStart < 0 ? string.Empty : vmdl[(indentStart + 1)..arrayStart];
+        propertyIndent = new string(propertyIndent.TakeWhile(char.IsWhiteSpace).ToArray());
+        var childIndent = propertyIndent + "    ";
+
+        var insertion = string.Concat(snippets.Select(snippet =>
+            Environment.NewLine + IndentSnippet(snippet.Trim(), childIndent) + ","));
+
+        vmdl = vmdl.Insert(arrayEnd, insertion + Environment.NewLine + propertyIndent);
+        File.WriteAllText(vmdlPath, vmdl, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static int FindMatchingBracket(string text, int openIndex)
+    {
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+
+        for (var i = openIndex; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (inString)
+            {
+                if (escaped) escaped = false;
+                else if (ch == '\\') escaped = true;
+                else if (ch == '"') inString = false;
+                continue;
+            }
+
+            if (ch == '"') inString = true;
+            else if (ch == '[') depth++;
+            else if (ch == ']' && --depth == 0) return i;
+        }
+
+        throw new InvalidDataException("RootNode.children has no matching closing bracket.");
+    }
+
+    private static string IndentSnippet(string text, string indent)
+        => string.Join(Environment.NewLine,
+            text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n')
+                .Split('\n')
+                .Select(line => indent + line));
 
     private static string NormalizeRelative(string path)
         => path.Replace('\\', '/').TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
