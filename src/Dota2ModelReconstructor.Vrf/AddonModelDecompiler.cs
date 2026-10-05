@@ -48,10 +48,6 @@ public sealed class AddonModelDecompiler
             // the PHYS values and KV3 structure remain untouched.
             var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
             File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            // Feed the exact PHYS dump to the two legacy reconstruction helpers.
-            // Their generated TXT files are kept beside phys.txt for the next merge stage.
-            LegacyPhysToolRunner.Run(physPath, reconstructionDirectory);
         }
 
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
