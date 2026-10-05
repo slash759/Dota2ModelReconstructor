@@ -31,6 +31,21 @@ public sealed class AddonModelDecompiler
             throw new InvalidDataException("S2V did not produce VMDL data.");
         File.WriteAllBytes(vmdlPath, content.Data);
 
+        // Preserve S2V 19.2's own textual representation of the PHYS block. The legacy
+        // reconstruction helpers consume this dump as phys.txt, so do not reformat it.
+        var physBlock = resource.GetBlockByType(BlockType.PHYS);
+        if (physBlock is not null)
+        {
+            var reconstructionDirectory = Path.Combine(
+                Path.GetDirectoryName(vmdlPath)!,
+                "reconstruction",
+                Path.GetFileNameWithoutExtension(vmdlPath));
+            Directory.CreateDirectory(reconstructionDirectory);
+
+            var physPath = Path.Combine(reconstructionDirectory, "phys.txt");
+            File.WriteAllText(physPath, physBlock.ToString(), new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+
         // S2V exposes the full DMX destinations through ModelExtract. The ContentFile
         // subfiles are generated in the same order: render meshes, hulls, physics meshes,
         // then animations.
