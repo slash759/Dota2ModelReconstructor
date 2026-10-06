@@ -11,11 +11,11 @@ public sealed class MainForm : Form
     private readonly Label selectedLabel = new() { Dock = DockStyle.Top, AutoEllipsis = true, Height = 42, Text = "Modelo: ninguno" };
     private readonly TextBox outputText = new() { Dock = DockStyle.Top, ReadOnly = true };
     private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
-    private readonly Button openModel = new() { Text = "Abrir VMDL_C" };
-    private readonly Button openVpk = new() { Text = "Abrir VPK" };
-    private readonly Button chooseOutput = new() { Text = "Seleccionar addon..." };
-    private readonly Button decompile = new() { Text = "DESCOMPILAR", Height = 48, Dock = DockStyle.Top, Enabled = false };
-    private readonly Button openOutput = new() { Text = "Abrir salida", Enabled = false };
+    private readonly Button openModel = new() { Text = "Open VMDL_C" };
+    private readonly Button openVpk = new() { Text = "Open VPK" };
+    private readonly Button chooseOutput = new() { Text = "Select addon folder..." };
+    private readonly Button decompile = new() { Text = "DECOMPILE", Height = 48, Dock = DockStyle.Top, Enabled = false };
+    private readonly Button openOutput = new() { Text = "Open output", Enabled = false };
     private readonly Button generateCapsules = new() { Text = "Probar PHYS / Generar cápsulas" };
 
     private VpkModelArchive? archive;
@@ -24,7 +24,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Dota 2 Model Reconstructor - S2V 19.2";
+        Text = "DOTA 2 Model Reconstructor";
         Width = 1050;
         Height = 680;
         MinimumSize = new Size(800, 500);
@@ -32,7 +32,7 @@ public sealed class MainForm : Form
         AllowDrop = true;
 
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(6) };
-        toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput, generateCapsules]);
+        toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput]);
 
         var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
         left.Controls.Add(tree);
@@ -78,19 +78,19 @@ public sealed class MainForm : Form
 
     private void BrowseModel()
     {
-        using var d = new OpenFileDialog { Filter = "Compiled model (*.vmdl_c)|*.vmdl_c", Title = "Abrir VMDL_C" };
+        using var d = new OpenFileDialog { Filter = "Compiled model (*.vmdl_c)|*.vmdl_c", Title = "Open VMDL_C" };
         if (d.ShowDialog(this) == DialogResult.OK) LoadDirectModel(d.FileName);
     }
 
     private void BrowseVpk()
     {
-        using var d = new OpenFileDialog { Filter = "Valve package (*.vpk)|*.vpk", Title = "Abrir VPK de Dota 2" };
+        using var d = new OpenFileDialog { Filter = "Valve package (*.vpk)|*.vpk", Title = "Open Dota 2 VPK" };
         if (d.ShowDialog(this) == DialogResult.OK) LoadVpk(d.FileName);
     }
 
     private void BrowseOutput()
     {
-        using var d = new FolderBrowserDialog { Description = "Selecciona la carpeta raíz del addon de Dota 2" };
+        using var d = new FolderBrowserDialog { Description = "Select the Dota 2 addon root folder" };
         if (d.ShowDialog(this) == DialogResult.OK) outputText.Text = d.SelectedPath;
     }
 
@@ -104,7 +104,7 @@ public sealed class MainForm : Form
         sourceLabel.Text = $"Archivo: {directModel}";
         selectedLabel.Text = $"Modelo: {Path.GetFileName(directModel)}";
         decompile.Enabled = true;
-        AppendLog($"Abierto: {directModel}");
+        AppendLog($"Opened: {directModel}");
     }
 
     private void LoadVpk(string path)
@@ -127,7 +127,7 @@ public sealed class MainForm : Form
         {
             archive?.Dispose();
             archive = null;
-            MessageBox.Show(this, ex.Message, "No se pudo abrir el VPK", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "Could not open VPK", MessageBoxButtons.OK, MessageBoxIcon.Error);
             AppendLog($"ERROR VPK: {ex}");
         }
         finally { Cursor = Cursors.Default; }
@@ -184,7 +184,7 @@ public sealed class MainForm : Form
 
         ToggleUi(false);
         openOutput.Enabled = false;
-        AppendLog("Descompilando...");
+        AppendLog("Decompiling...");
 
         try
         {
@@ -215,7 +215,7 @@ public sealed class MainForm : Form
             AppendLog($"GLTF: {result.GltfPath}");
             AppendLog("OK");
             openOutput.Enabled = true;
-            MessageBox.Show(this, "VMDL, GLTF y DMX generados dentro del addon.", "Terminado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Model reconstruction completed.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
@@ -223,39 +223,6 @@ public sealed class MainForm : Form
             MessageBox.Show(this, ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally { ToggleUi(true); }
-    }
-
-    private async Task GenerateCapsulesAsync()
-    {
-        using var d = new OpenFileDialog
-        {
-            Filter = "PHYS dump (*.txt)|*.txt",
-            Title = "Selecciona phys.txt",
-            FileName = "phys.txt"
-        };
-        if (d.ShowDialog(this) != DialogResult.OK) return;
-
-        generateCapsules.Enabled = false;
-        AppendLog($"Probando helpers PHYS con: {d.FileName}");
-
-        try
-        {
-            var results = await Task.Run(() => LegacyPhysToolRunner.Run(d.FileName));
-            if (results.Count == 0)
-                AppendLog("Los EXE terminaron, pero no se detectaron TXT nuevos.");
-            else
-                foreach (var result in results) AppendLog($"TXT generado: {result}");
-
-            MessageBox.Show(this,
-                results.Count == 0 ? "Los helpers terminaron sin TXT nuevos." : $"Helpers terminados. TXT generados: {results.Count}",
-                "Prueba PHYS", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            AppendLog($"ERROR PHYS: {ex}");
-            MessageBox.Show(this, ex.Message, "Error PHYS", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally { generateCapsules.Enabled = true; }
     }
 
     private void ToggleUi(bool enabled)
