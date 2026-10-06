@@ -37,7 +37,7 @@ public sealed class MainForm : Form
 
         var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
         right.Controls.Add(decompile);
-        right.Controls.Add(new Label { Text = "Addon de destino (content\\dota_addons\\...)", Dock = DockStyle.Top, Height = 22 });
+        right.Controls.Add(new Label { Text = "Addon Folder", Dock = DockStyle.Top, Height = 22 });
         right.Controls.Add(outputText);
 
         var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 430 };
