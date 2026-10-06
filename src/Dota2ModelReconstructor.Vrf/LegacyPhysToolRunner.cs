@@ -8,10 +8,10 @@ public static class LegacyPhysToolRunner
     private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect", "blendphys"];
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
-    public static IReadOnlyList<string> Run(string sourcePhysPath, string blenderFilesDirectory)
+    public static IReadOnlyList<string> Run(string sourcePhysPath, string? blenderFilesDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePhysPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(blenderFilesDirectory);
+
         if (!File.Exists(sourcePhysPath))
             throw new FileNotFoundException("phys.txt not found.", sourcePhysPath);
 
@@ -54,13 +54,16 @@ public static class LegacyPhysToolRunner
 
             // blendphys.exe is deliberately the last PHYS helper. Copy every file it
             // generated/changed into blenderFiles before phys.txt is cleaned up.
-            Directory.CreateDirectory(blenderFilesDirectory);
-            foreach (var path in generatedFiles.Where(path =>
-                         !Path.GetFileName(path).Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase) &&
-                         !Path.GetFileName(path).Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrWhiteSpace(blenderFilesDirectory))
             {
-                if (!File.Exists(path)) continue;
-                File.Copy(path, Path.Combine(blenderFilesDirectory, Path.GetFileName(path)), overwrite: true);
+                Directory.CreateDirectory(blenderFilesDirectory);
+                foreach (var path in generatedFiles.Where(path =>
+                             !Path.GetFileName(path).Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase) &&
+                             !Path.GetFileName(path).Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!File.Exists(path)) continue;
+                    File.Copy(path, Path.Combine(blenderFilesDirectory, Path.GetFileName(path)), overwrite: true);
+                }
             }
 
             return generatedFiles.ToArray();
