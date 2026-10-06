@@ -6,17 +6,13 @@ namespace Dota2ModelReconstructor.Ui;
 public sealed class MainForm : Form
 {
     private readonly TreeView tree = new() { Dock = DockStyle.Fill, HideSelection = false };
-    private readonly TextBox search = new() { Dock = DockStyle.Top, PlaceholderText = "Buscar modelo..." };
-    private readonly Label sourceLabel = new() { Dock = DockStyle.Top, AutoEllipsis = true, Height = 38, Text = "Arrastra un .vmdl_c o pak01_dir.vpk aquí" };
-    private readonly Label selectedLabel = new() { Dock = DockStyle.Top, AutoEllipsis = true, Height = 42, Text = "Modelo: ninguno" };
     private readonly TextBox outputText = new() { Dock = DockStyle.Top, ReadOnly = true };
     private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
-    private readonly Button openModel = new() { Text = "Open VMDL_C" };
+    private readonly Button openModel = new() { Text = "Open VMDL" };
     private readonly Button openVpk = new() { Text = "Open VPK" };
-    private readonly Button chooseOutput = new() { Text = "Select addon folder..." };
+    private readonly Button chooseOutput = new() { Text = "Select Addon Folder" };
     private readonly Button decompile = new() { Text = "DECOMPILE", Height = 48, Dock = DockStyle.Top, Enabled = false };
-    private readonly Button openOutput = new() { Text = "Open output", Enabled = false };
-    private readonly Button generateCapsules = new() { Text = "Probar PHYS / Generar cápsulas" };
+    private readonly Button openOutput = new() { Text = "Open Addon Folder", Enabled = false };
 
     private VpkModelArchive? archive;
     private string? directModel;
@@ -36,32 +32,30 @@ public sealed class MainForm : Form
 
         var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
         left.Controls.Add(tree);
-        left.Controls.Add(search);
-        left.Controls.Add(new Label { Text = "Modelos del VPK", Dock = DockStyle.Top, Height = 24 });
+        left.Controls.Add(new Label { Text = "VPK Models", Dock = DockStyle.Top, Height = 24 });
 
         var right = new Panel { Dock = DockStyle.Fill, Padding = new Padding(10) };
-        right.Controls.Add(log);
         right.Controls.Add(decompile);
         right.Controls.Add(new Label { Text = "Addon de destino (content\\dota_addons\\...)", Dock = DockStyle.Top, Height = 22 });
         right.Controls.Add(outputText);
-        right.Controls.Add(selectedLabel);
-        right.Controls.Add(sourceLabel);
 
         var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 430 };
         split.Panel1.Controls.Add(left);
         split.Panel2.Controls.Add(right);
 
+        var logPanel = new Panel { Dock = DockStyle.Bottom, Height = 145, Padding = new Padding(8) };
+        logPanel.Controls.Add(log);
+
         Controls.Add(split);
+        Controls.Add(logPanel);
         Controls.Add(toolbar);
 
         openModel.Click += (_, _) => BrowseModel();
         openVpk.Click += (_, _) => BrowseVpk();
         chooseOutput.Click += (_, _) => BrowseOutput();
         openOutput.Click += (_, _) => OpenOutputFolder();
-        generateCapsules.Click += async (_, _) => await GenerateCapsulesAsync();
         decompile.Click += async (_, _) => await DecompileAsync();
         tree.AfterSelect += (_, e) => SelectTreeModel(e.Node);
-        search.TextChanged += (_, _) => RebuildTree(search.Text);
         DragEnter += OnDragEnter;
         DragDrop += OnDragDrop;
 
@@ -101,8 +95,6 @@ public sealed class MainForm : Form
         selectedVpkModel = null;
         directModel = Path.GetFullPath(path);
         tree.Nodes.Clear();
-        sourceLabel.Text = $"Archivo: {directModel}";
-        selectedLabel.Text = $"Modelo: {Path.GetFileName(directModel)}";
         decompile.Enabled = true;
         AppendLog($"Opened: {directModel}");
     }
@@ -116,9 +108,7 @@ public sealed class MainForm : Form
             archive = new VpkModelArchive(path);
             directModel = null;
             selectedVpkModel = null;
-            sourceLabel.Text = $"VPK: {archive.FileName}";
-            selectedLabel.Text = "Modelo: selecciona un .vmdl_c";
-            RebuildTree(search.Text);
+                    RebuildTree(string.Empty);
             decompile.Enabled = false;
             AppendLog($"VPK abierto: {archive.FileName}");
             AppendLog($"Modelos VMDL_C encontrados: {archive.Models.Count:N0}");
@@ -173,7 +163,6 @@ public sealed class MainForm : Form
     {
         if (node.Tag is not string path || !path.EndsWith(".vmdl_c", StringComparison.OrdinalIgnoreCase)) return;
         selectedVpkModel = path;
-        selectedLabel.Text = $"Modelo: {path}";
         decompile.Enabled = archive is not null;
     }
 
@@ -231,7 +220,6 @@ public sealed class MainForm : Form
         openVpk.Enabled = enabled;
         chooseOutput.Enabled = enabled;
         tree.Enabled = enabled;
-        search.Enabled = enabled;
         decompile.Enabled = enabled && (directModel is not null || selectedVpkModel is not null);
     }
 
