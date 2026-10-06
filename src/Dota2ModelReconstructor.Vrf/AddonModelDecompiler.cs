@@ -144,7 +144,7 @@ public sealed class AddonModelDecompiler
         if (!Directory.Exists(blenderFilesDirectory))
             return;
 
-        foreach (var pattern in new[] { "*.png", "*.bin", "*.dmx" })
+        foreach (var pattern in new[] { "*.png", "*.dmx" })
         {
             foreach (var path in Directory.EnumerateFiles(blenderFilesDirectory, pattern, SearchOption.AllDirectories))
             {
