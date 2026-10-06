@@ -8,12 +8,12 @@ public sealed class MainForm : Form
     private readonly TreeView tree = new() { Dock = DockStyle.Fill, HideSelection = false };
     private readonly TextBox outputText = new() { Dock = DockStyle.Top, ReadOnly = true };
     private readonly TextBox log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
-    private readonly Button openModel = new() { Text = "Open VMDL" };
-    private readonly Button openVpk = new() { Text = "Open VPK" };
-    private readonly Button chooseOutput = new() { Text = "Select Addon Folder" };
+    private readonly Button openModel = new() { Text = "Open VMDL", AutoSize = true };
+    private readonly Button openVpk = new() { Text = "Open VPK", AutoSize = true };
+    private readonly Button chooseOutput = new() { Text = "Select Addon Folder", AutoSize = true };
     private readonly Button decompile = new() { Text = "DECOMPILE", Height = 48, Dock = DockStyle.Top, Enabled = false };
-    private readonly Button openOutput = new() { Text = "Open Addon Folder", Enabled = false };
-    private readonly Button decompileSnap = new() { Text = "Decompile SNAP" };
+    private readonly Button openOutput = new() { Text = "Open Addon Folder", Enabled = false, AutoSize = true };
+    private readonly Button decompileSnap = new() { Text = "Decompile SNAP", AutoSize = true };
 
     private VpkModelArchive? archive;
     private string? directModel;
