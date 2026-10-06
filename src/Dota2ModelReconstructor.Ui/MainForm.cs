@@ -31,6 +31,10 @@ public sealed class MainForm : Form
         var toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(6) };
         toolbar.Controls.AddRange([openModel, openVpk, chooseOutput, openOutput]);
 
+        var extraToolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 42, Padding = new Padding(6) };
+        extraToolbar.Controls.Add(new Label { Text = "Extra", AutoSize = true, Margin = new Padding(0, 7, 8, 0) });
+        extraToolbar.Controls.Add(decompileSnap);
+
         var left = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
         left.Controls.Add(tree);
         left.Controls.Add(new Label { Text = "VPK Models", Dock = DockStyle.Top, Height = 24 });
