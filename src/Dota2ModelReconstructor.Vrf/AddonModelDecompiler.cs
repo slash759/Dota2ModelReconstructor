@@ -132,7 +132,24 @@ public sealed class AddonModelDecompiler
             }
         }
 
+        CleanupBlenderIntermediates(Path.GetDirectoryName(gltfPath)!);
+
         return new DecompileResult(vmdlPath, gltfPath);
+    }
+
+    private static void CleanupBlenderIntermediates(string blenderFilesDirectory)
+    {
+        if (!Directory.Exists(blenderFilesDirectory))
+            return;
+
+        foreach (var pattern in new[] { "*.png", "*.bin", "*.dmx" })
+        {
+            foreach (var path in Directory.EnumerateFiles(blenderFilesDirectory, pattern, SearchOption.AllDirectories))
+            {
+                try { File.Delete(path); }
+                catch { /* Best-effort cleanup; do not discard a successful decompile. */ }
+            }
+        }
     }
 
     private static void WriteFlexControllerFile(string outputPath, string modelName, string controlsText, string flexRulesText)
