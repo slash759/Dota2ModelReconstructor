@@ -96,7 +96,97 @@ public sealed class AddonModelDecompiler
         };
         exporter.Export(resource, gltfPath);
 
+        // Morph/flex reconstruction only exists for models that actually contain MRPH.
+        // The legacy helpers consume S2V/VRF's textual MRPH representation as compiled.txt.
+        var morphBlock = resource.GetBlockByType(BlockType.MRPH);
+        if (morphBlock is not null)
+        {
+            var compiledPath = Path.Combine(Path.GetTempPath(), $"Dota2ModelReconstructor-{Guid.NewGuid():N}-compiled.txt");
+            try
+            {
+                var compiledText = morphBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
+                File.WriteAllText(compiledPath, compiledText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+                var morphOutputs = LegacyMorphToolRunner.Run(compiledPath);
+                try
+                {
+                    var flexPath = Path.Combine(
+                        Path.GetDirectoryName(gltfPath)!,
+                        "flex_" + Path.GetFileNameWithoutExtension(vmdlPath));
+
+                    WriteFlexControllerFile(
+                        flexPath,
+                        Path.GetFileNameWithoutExtension(vmdlPath),
+                        File.ReadAllText(morphOutputs.ControlsPath),
+                        File.ReadAllText(morphOutputs.FlexRulesPath));
+                }
+                finally
+                {
+                    LegacyMorphToolRunner.CleanupGeneratedFiles();
+                }
+            }
+            finally
+            {
+                try { if (File.Exists(compiledPath)) File.Delete(compiledPath); }
+                catch { /* Best-effort cleanup. */ }
+            }
+        }
+
         return new DecompileResult(vmdlPath, gltfPath);
+    }
+
+    private static void WriteFlexControllerFile(string outputPath, string modelName, string controlsText, string flexRulesText)
+    {
+        var controlCount = CountOccurrences(controlsText, "\"DmeCombinationInputControl\"");
+        var values = string.Join(", ", Enumerable.Repeat("\"0.0 0.0 0.5\"", controlCount));
+
+        var text =
+$"""<!-- dmx encoding keyvalues2 1 format model 1 -->
+"DmElement"
+{{
+    "id" "elementid" "{Guid.NewGuid()}"
+    "name" "string" "flex_{modelName}"
+    "combinationOperator" "DmeCombinationOperator"
+    {{
+        "id" "elementid" "{Guid.NewGuid()}"
+        "name" "string" "combinationOperator"
+        "controls" "element_array"
+        [
+{IndentSnippet(controlsText.Trim().TrimStart('[').TrimEnd(']'), "            ")}
+        ]
+        "controlValues" "vector3_array" [{values}]
+        "controlValuesLagged" "vector3_array" [{values}]
+        "usesLaggedValues" "bool" "0"
+        "dominators" "element_array" [ ]
+        "targets" "element_array"
+        [
+            "DmeFlexRules"
+            {{
+                "id" "elementid" "{Guid.NewGuid()}"
+                "name" "string" "flex_{modelName}"
+                "deltaStates" "element_array"
+                [
+{IndentSnippet(flexRulesText.Trim().TrimStart('[').TrimEnd(']'), "                    ")}
+                ]
+            }}
+        ]
+    }}
+}}
+""";
+
+        File.WriteAllText(outputPath, text, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+        return count;
     }
 
     private static void AppendRootChildren(string vmdlPath, IEnumerable<string> helperOutputs)
