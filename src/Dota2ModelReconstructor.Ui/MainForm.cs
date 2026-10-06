@@ -53,6 +53,7 @@ public sealed class MainForm : Form
 
         Controls.Add(split);
         Controls.Add(logPanel);
+        Controls.Add(extraToolbar);
         Controls.Add(toolbar);
 
         openModel.Click += (_, _) => BrowseModel();
@@ -65,9 +66,7 @@ public sealed class MainForm : Form
         DragEnter += OnDragEnter;
         DragDrop += OnDragDrop;
 
-        AppendLog("Motor: Source 2 Viewer / ValveResourceFormat 19.2 vendorizado");
-        AppendLog("Powered by Source 2 Viewer (ValveResourceFormat) - https://s2v.app");
-        AppendLog("Puedes abrir/arrastrar un .vmdl_c o navegar pak01_dir.vpk.");
+        AppendLog("Powered by Source 2 Viewer (ValveResourceFormat)");
     }
 
     protected override void Dispose(bool disposing)
@@ -116,8 +115,8 @@ public sealed class MainForm : Form
             selectedVpkModel = null;
                     RebuildTree(string.Empty);
             decompile.Enabled = false;
-            AppendLog($"VPK abierto: {archive.FileName}");
-            AppendLog($"Modelos VMDL_C encontrados: {archive.Models.Count:N0}");
+            AppendLog($"VPK opened: {archive.FileName}");
+            AppendLog($"VMDL_C models found: {archive.Models.Count:N0}");
         }
         catch (Exception ex)
         {
@@ -206,9 +205,7 @@ public sealed class MainForm : Form
             }
             else return;
 
-            AppendLog($"VMDL: {result.VmdlPath}");
-            AppendLog($"GLTF: {result.GltfPath}");
-            AppendLog("OK");
+            AppendLog("Decompile completed successfully.");
             openOutput.Enabled = true;
             MessageBox.Show(this, "Model reconstruction completed.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
