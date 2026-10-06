@@ -12,7 +12,8 @@ public sealed class MainForm : Form
     private readonly Button openVpk = new() { Text = "Open VPK" };
     private readonly Button chooseOutput = new() { Text = "Select Addon Folder" };
     private readonly Button decompile = new() { Text = "DECOMPILE", Height = 48, Dock = DockStyle.Top, Enabled = false };
-    private readonly Button openOutput = new() { Text = "Open Addon Folder", Enabled = false };\n    private readonly Button decompileSnap = new() { Text = "Decompile SNAP" };
+    private readonly Button openOutput = new() { Text = "Open Addon Folder", Enabled = false };
+    private readonly Button decompileSnap = new() { Text = "Decompile SNAP" };
 
     private VpkModelArchive? archive;
     private string? directModel;
@@ -53,7 +54,8 @@ public sealed class MainForm : Form
         openModel.Click += (_, _) => BrowseModel();
         openVpk.Click += (_, _) => BrowseVpk();
         chooseOutput.Click += (_, _) => BrowseOutput();
-        openOutput.Click += (_, _) => OpenOutputFolder();\n        decompileSnap.Click += async (_, _) => await DecompileSnapAsync();
+        openOutput.Click += (_, _) => OpenOutputFolder();
+        decompileSnap.Click += async (_, _) => await DecompileSnapAsync();
         decompile.Click += async (_, _) => await DecompileAsync();
         tree.AfterSelect += (_, e) => SelectTreeModel(e.Node);
         DragEnter += OnDragEnter;
@@ -252,7 +254,8 @@ public sealed class MainForm : Form
     {
         openModel.Enabled = enabled;
         openVpk.Enabled = enabled;
-        chooseOutput.Enabled = enabled;\n        decompileSnap.Enabled = enabled;
+        chooseOutput.Enabled = enabled;
+        decompileSnap.Enabled = enabled;
         tree.Enabled = enabled;
         decompile.Enabled = enabled && (directModel is not null || selectedVpkModel is not null);
     }
