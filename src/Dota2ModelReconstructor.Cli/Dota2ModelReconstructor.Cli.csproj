@@ -19,5 +19,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-  </ItemGroup>
+    <Content Include="..\\..\\tools\\legacy\\snap\\**\\*">\n      <Link>tools\\legacy\\snap\\%(RecursiveDir)%(Filename)%(Extension)</Link>\n      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>\n      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>\n    </Content>\n  </ItemGroup>
 </Project>
