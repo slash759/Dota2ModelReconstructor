@@ -139,40 +139,47 @@ public sealed class AddonModelDecompiler
     {
         var controlCount = CountOccurrences(controlsText, "\"DmeCombinationInputControl\"");
         var values = string.Join(", ", Enumerable.Repeat("\"0.0 0.0 0.5\"", controlCount));
+        var rootId = Guid.NewGuid();
+        var operatorId = Guid.NewGuid();
+        var rulesId = Guid.NewGuid();
+        var controls = IndentSnippet(controlsText.Trim().TrimStart('[').TrimEnd(']'), "            ");
+        var rules = IndentSnippet(flexRulesText.Trim().TrimStart('[').TrimEnd(']'), "                    ");
 
-        var text =
-$"""<!-- dmx encoding keyvalues2 1 format model 1 -->
-"DmElement"
-{{
-    "id" "elementid" "{Guid.NewGuid()}"
-    "name" "string" "flex_{modelName}"
-    "combinationOperator" "DmeCombinationOperator"
-    {{
-        "id" "elementid" "{Guid.NewGuid()}"
-        "name" "string" "combinationOperator"
-        "controls" "element_array"
-        [
-{IndentSnippet(controlsText.Trim().TrimStart('[').TrimEnd(']'), "            ")}
-        ]
-        "controlValues" "vector3_array" [{values}]
-        "controlValuesLagged" "vector3_array" [{values}]
-        "usesLaggedValues" "bool" "0"
-        "dominators" "element_array" [ ]
-        "targets" "element_array"
-        [
-            "DmeFlexRules"
-            {{
-                "id" "elementid" "{Guid.NewGuid()}"
-                "name" "string" "flex_{modelName}"
-                "deltaStates" "element_array"
-                [
-{IndentSnippet(flexRulesText.Trim().TrimStart('[').TrimEnd(']'), "                    ")}
-                ]
-            }}
-        ]
-    }}
-}}
-""";
+        var text = string.Join(Environment.NewLine, new[]
+        {
+            "<!-- dmx encoding keyvalues2 1 format model 1 -->",
+            "\"DmElement\"",
+            "{",
+            $"    \"id\" \"elementid\" \"{rootId}\"",
+            $"    \"name\" \"string\" \"flex_{modelName}\"",
+            "    \"combinationOperator\" \"DmeCombinationOperator\"",
+            "    {",
+            $"        \"id\" \"elementid\" \"{operatorId}\"",
+            "        \"name\" \"string\" \"combinationOperator\"",
+            "        \"controls\" \"element_array\"",
+            "        [",
+            controls,
+            "        ]",
+            $"        \"controlValues\" \"vector3_array\" [{values}]",
+            $"        \"controlValuesLagged\" \"vector3_array\" [{values}]",
+            "        \"usesLaggedValues\" \"bool\" \"0\"",
+            "        \"dominators\" \"element_array\" [ ]",
+            "        \"targets\" \"element_array\"",
+            "        [",
+            "            \"DmeFlexRules\"",
+            "            {",
+            $"                \"id\" \"elementid\" \"{rulesId}\"",
+            $"                \"name\" \"string\" \"flex_{modelName}\"",
+            "                \"deltaStates\" \"element_array\"",
+            "                [",
+            rules,
+            "                ]",
+            "            }",
+            "        ]",
+            "    }",
+            "}",
+            string.Empty,
+        });
 
         File.WriteAllText(outputPath, text, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
