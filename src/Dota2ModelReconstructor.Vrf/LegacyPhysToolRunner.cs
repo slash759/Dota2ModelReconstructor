@@ -5,12 +5,13 @@ namespace Dota2ModelReconstructor.Vrf;
 
 public static class LegacyPhysToolRunner
 {
-    private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect"];
+    private static readonly string[] ToolBaseNames = ["physvmdl", "clothEffect", "blendphys"];
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
-    public static IReadOnlyList<string> Run(string sourcePhysPath)
+    public static IReadOnlyList<string> Run(string sourcePhysPath, string blenderFilesDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePhysPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blenderFilesDirectory);
         if (!File.Exists(sourcePhysPath))
             throw new FileNotFoundException("phys.txt not found.", sourcePhysPath);
 
@@ -24,9 +25,9 @@ public static class LegacyPhysToolRunner
 
             foreach (var tool in ToolBaseNames)
             {
-                var before = SnapshotTxtFiles(toolsDirectory);
+                var before = SnapshotFiles(toolsDirectory);
                 var result = RunTool(toolsDirectory, tool);
-                var after = SnapshotTxtFiles(toolsDirectory);
+                var after = SnapshotFiles(toolsDirectory);
                 var changedByTool = new List<string>();
 
                 foreach (var (path, fingerprint) in after)
@@ -49,6 +50,17 @@ public static class LegacyPhysToolRunner
                 if (result.ExitCode != 0 && changedByTool.Count == 0)
                     throw new InvalidOperationException(
                         $"{tool}.exe failed with exit code {result.ExitCode}.\n{result.StandardError}\n{result.StandardOutput}".Trim());
+            }
+
+            // blendphys.exe is deliberately the last PHYS helper. Copy every file it
+            // generated/changed into blenderFiles before phys.txt is cleaned up.
+            Directory.CreateDirectory(blenderFilesDirectory);
+            foreach (var path in generatedFiles.Where(path =>
+                         !Path.GetFileName(path).Equals("cloth_shapes.vmdl.txt", StringComparison.OrdinalIgnoreCase) &&
+                         !Path.GetFileName(path).Equals("cloth_effects_vmdl.txt", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (!File.Exists(path)) continue;
+                File.Copy(path, Path.Combine(blenderFilesDirectory, Path.GetFileName(path)), overwrite: true);
             }
 
             return generatedFiles.ToArray();
@@ -149,11 +161,11 @@ public static class LegacyPhysToolRunner
 
     private sealed record ToolResult(int ExitCode, string StandardOutput, string StandardError);
 
-    private static Dictionary<string, string> SnapshotTxtFiles(string directory)
+    private static Dictionary<string, string> SnapshotFiles(string directory)
     {
         var snapshot = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var path in Directory.EnumerateFiles(directory, "*.txt"))
+        foreach (var path in Directory.EnumerateFiles(directory))
         {
             using var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             var hash = Convert.ToHexString(SHA256.HashData(stream));
