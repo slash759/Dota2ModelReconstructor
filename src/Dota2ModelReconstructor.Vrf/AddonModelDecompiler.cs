@@ -31,6 +31,9 @@ public sealed class AddonModelDecompiler
             throw new InvalidDataException("S2V did not produce VMDL data.");
         File.WriteAllBytes(vmdlPath, content.Data);
 
+        var blenderFilesDirectory = Path.Combine(Path.GetDirectoryName(vmdlPath)!, "blenderFiles");
+        Directory.CreateDirectory(blenderFilesDirectory);
+
         // Preserve S2V 19.2's own textual representation of the PHYS block. The legacy
         // reconstruction helpers consume this dump as phys.txt, so do not reformat it.
         var physBlock = resource.GetBlockByType(BlockType.PHYS);
@@ -45,7 +48,7 @@ public sealed class AddonModelDecompiler
                 var physText = physBlock.ToString().Replace("\t", "    ", StringComparison.Ordinal);
                 File.WriteAllText(physPath, physText, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-                var helperOutputs = LegacyPhysToolRunner.Run(physPath);
+                var helperOutputs = LegacyPhysToolRunner.Run(physPath, blenderFilesDirectory);
                 try
                 {
                     // Read and merge the helper outputs while they still exist beside the
@@ -88,8 +91,7 @@ public sealed class AddonModelDecompiler
 
         // Keep the GLTF next to the decompiled VMDL; DMX files instead live at the
         // source_filename locations expected by ModelDoc.
-        var gltfPath = Path.Combine(Path.GetDirectoryName(vmdlPath)!, "blenderFiles", Path.GetFileNameWithoutExtension(vmdlPath) + ".gltf");
-        Directory.CreateDirectory(Path.GetDirectoryName(gltfPath)!);
+        var gltfPath = Path.Combine(blenderFilesDirectory, Path.GetFileNameWithoutExtension(vmdlPath) + ".gltf");
         var exporter = new GltfModelExporter(fileLoader)
         {
             ProgressReporter = new Progress<string>(_ => { }),
